@@ -2,11 +2,40 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-15
+
 ### Added
 
-- Recruiter-focused engineering case study and public roadmap.
-- Social-preview artwork for repository sharing.
-- README navigation, CI badges, design context, and engineering highlights.
+- Ordered source modules under `src/` and a deterministic build that produces the
+  deployable `Code.gs` bundle.
+- A credential-free simulator for voicemail, missed-call, and duplicate scenarios.
+- A public-safety scanner for secrets, private configuration, and voicemail media.
+- A repository consistency check for local documentation links and JSON files.
+- Configuration, operations, and architecture-decision documentation.
+- A synthetic example of the required Apps Script properties.
+
+### Changed
+
+- Made the public configuration provider-neutral: generic webhook, UTC, no assumed
+  country code, and internal notifications disabled by default.
+- Reworked caller extraction to support excluded phone numbers and a configurable
+  preference pattern instead of embedding provider-specific assumptions.
+- Made the generic inbound preset clear provider-specific country normalization as
+  well as sender and caller-selection rules.
+- Replaced domain-specific operator messages and priority keywords with reusable
+  English defaults.
+- Expanded CI validation across Node.js 20, 22, and 24.
+- Reframed the README, case study, and roadmap around explicit engineering decisions,
+  operational boundaries, and a reusable communications policy engine.
+
+### Security
+
+- Added regression coverage for excluded service numbers so they cannot be mistaken
+  for callers.
+- Added a repository-wide safety check that fails when likely credentials, private
+  Apps Script metadata, or voicemail media are committed.
+- Provider endpoints now fail closed unless they use HTTPS, and stored provider
+  message references are hashed.
 
 ## [1.3.1] - 2026-09-15
 

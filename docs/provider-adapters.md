@@ -1,10 +1,10 @@
 # Provider adapters
 
-The runtime chooses an adapter using `SMS_PROVIDER`. Credentials belong in Apps Script Script Properties and are intentionally absent from this repository.
+The runtime chooses an adapter using `SMS_PROVIDER`; the neutral public default is `webhook`. Credentials belong in Apps Script Script Properties and are intentionally absent from this repository.
 
 ## Modulus
 
-Use `SMS_PROVIDER=modulus` with `MODULUS_API_KEY` and `SMS_SENDER_ID`. The adapter accepts only the approved HTTPS endpoint and validates the sender ID and SMS segment limit before sending. `configureModulusEmailPreset()` configures the known Modulus email subjects, caller label, and exact sender allowlist. The adapter is optional and can be removed without changing the Gmail parser, deduplication, privacy controls, or tests.
+Use `SMS_PROVIDER=modulus` with `MODULUS_API_KEY` and `SMS_SENDER_ID`. The adapter accepts only the approved HTTPS endpoint and validates the sender ID and SMS segment limit before sending. `configureModulusEmailPreset()` configures the known Modulus email subjects, caller label, exact sender allowlist, and number-selection preference. The preset does not select this outbound adapter. Both components are optional.
 
 ## Twilio
 
@@ -30,6 +30,11 @@ Use `SMS_PROVIDER=webhook`, `GENERIC_SMS_API_URL`, and optionally `GENERIC_SMS_A
   "correlationId": "hashed-or-provider-safe-id"
 }
 ```
+
+All provider endpoints must use HTTPS. `GENERIC_SMS_API_OAUTH_TOKEN` is a
+pre-provisioned bearer token; the script does not perform an OAuth token exchange for
+an arbitrary webhook. Google account authorization is handled separately by Apps
+Script during initialization.
 
 The bearer token is sent in the `Authorization` header. Adapt the body in `sendSmsViaWebhook_()` if a gateway uses different field names.
 
