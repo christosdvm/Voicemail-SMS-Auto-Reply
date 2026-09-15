@@ -1,78 +1,15 @@
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
-import vm from 'node:vm';
+import { loadRuntimeContext } from './helpers/runtime-context.mjs';
 
-const source = fs.readFileSync(new URL('../Code.gs', import.meta.url), 'utf8');
 const fixture = (name) =>
   fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
-const scriptProperties = new Map();
-const context = {
-  console,
-  PropertiesService: {
-    getScriptProperties() {
-      return {
-        getProperty(key) {
-          return scriptProperties.has(key) ? scriptProperties.get(key) : null;
-        },
-        setProperty(key, value) {
-          scriptProperties.set(key, String(value));
-        },
-        setProperties(values) {
-          Object.entries(values).forEach(([key, value]) => {
-            scriptProperties.set(key, String(value));
-          });
-        },
-        deleteProperty(key) {
-          scriptProperties.delete(key);
-        },
-        getProperties() {
-          return Object.fromEntries(scriptProperties.entries());
-        },
-      };
-    },
-  },
-  Utilities: {
-    DigestAlgorithm: { SHA_256: 'SHA_256' },
-    Charset: { UTF_8: 'UTF_8' },
-    base64Encode(value) {
-      return Buffer.from(value).toString('base64');
-    },
-    base64EncodeWebSafe(value) {
-      return Buffer.from(value).toString('base64url');
-    },
-    base64DecodeWebSafe(value) {
-      return [...Buffer.from(value, 'base64url')];
-    },
-    computeHmacSha256Signature(value, key) {
-      return [...crypto.createHmac('sha256', key).update(value).digest()];
-    },
-    computeDigest(_algorithm, value) {
-      return [...crypto.createHash('sha256').update(String(value)).digest()];
-    },
-    getUuid() {
-      return crypto.randomUUID();
-    },
-    newBlob(value) {
-      return {
-        getDataAsString() {
-          return Buffer.from(value).toString('utf8');
-        },
-      };
-    },
-    formatDate(date, _timeZone, format) {
-      if (format === 'H') return String(new Date(date).getUTCHours());
-      return new Date(date).toISOString();
-    },
-  },
-};
-
-vm.createContext(context);
-vm.runInContext(source, context, { filename: 'Code.gs' });
+const { context, scriptProperties } = loadRuntimeContext();
 
 scriptProperties.set('DEFAULT_COUNTRY_CODE', '30');
 scriptProperties.set('CALLER_NUMBER_LABELS', 'caller number|from number|Από τον αριθμό');
+scriptProperties.set('CALLER_NUMBER_PREFERENCE_PATTERN', '^\\+3069\\d{8}$');
 
 assert.equal(
   context.extractPhoneFromText_('Caller number: +44 7700 900123'),
@@ -94,6 +31,16 @@ assert.equal(
   ),
   '+306980000004'
 );
+scriptProperties.set('CALLER_NUMBER_PREFERENCE_PATTERN', '');
+scriptProperties.set('EXCLUDED_PHONE_NUMBERS', '+302118001111');
+assert.equal(
+  context.extractPhoneFromFilename_(
+    '00302118001111-6980000004-20260907-181425.wav'
+  ),
+  '+306980000004'
+);
+scriptProperties.delete('EXCLUDED_PHONE_NUMBERS');
+scriptProperties.set('CALLER_NUMBER_PREFERENCE_PATTERN', '^\\+3069\\d{8}$');
 assert.equal(context.extractAnyGreekMobile_('6980000005 no-reply@example.invalid'), '+306980000005');
 assert.equal(context.normalizePhoneE164_('0030 698 000 0003', '30'), '+306980000003');
 assert.equal(context.normalizePhoneE164_('07700 900123', '44'), '+447700900123');
@@ -159,6 +106,9 @@ assert.equal(
   context.isAllowedModulusEndpoint_('https://example.invalid/modulus'),
   false
 );
+assert.equal(context.isHttpsEndpoint_('https://sms.example.invalid/send'), true);
+assert.equal(context.isHttpsEndpoint_('http://sms.example.invalid/send'), false);
+assert.equal(context.isHttpsEndpoint_('https://user@example.invalid/send'), false);
 assert.equal(
   context.isAllowedCallTrackingWebAppUrl_('https://script.google.com/macros/s/synthetic-id_123/exec'),
   true
@@ -212,11 +162,14 @@ context.setMessageState_('state-message-id', {
   messageId: 'state-message-id',
   status: 'dry_run',
   phoneMasked: '******0007',
+  providerMessageId: 'synthetic-provider-message-id',
   updatedAt: new Date().toISOString(),
 });
 const savedState = JSON.parse(scriptProperties.get(context.stateKey_('state-message-id')));
 assert.equal(savedState.messageId, undefined);
+assert.equal(savedState.providerMessageId, undefined);
 assert.equal(typeof savedState.messageIdHash, 'string');
+assert.equal(typeof savedState.providerMessageIdHash, 'string');
 scriptProperties.set('STATE_RETENTION_DAYS', '7');
 scriptProperties.set(
   context.stateKey_('old-message'),
@@ -267,7 +220,7 @@ assert.equal(parsedFixture.phoneE164, '+447700900123');
 assert.equal(parsedFixture.audio.getName(), 'synthetic-voicemail.wav');
 assert.equal(parsedFixture.messageType, 'voicemail');
 
-assert.equal(context.getSmsProvider_(), 'modulus');
+assert.equal(context.getSmsProvider_(), 'webhook');
 scriptProperties.set('SMS_PROVIDER', 'telnyx');
 assert.equal(
   JSON.stringify(context.getSmsProviderRequirements_()),
@@ -299,6 +252,12 @@ const webhookResult = context.sendSms_('+447700900123', 'Synthetic test', 'test-
 assert.equal(webhookResult.accepted, true);
 assert.equal(lastRequest.endpoint, 'https://sms.example.invalid/send');
 assert.equal(JSON.parse(lastRequest.options.payload).to, '+447700900123');
+scriptProperties.set('GENERIC_SMS_API_URL', 'http://sms.example.invalid/send');
+assert.throws(
+  () => context.sendSms_('+447700900123', 'Synthetic test', 'test-http'),
+  /must use HTTPS/
+);
+scriptProperties.set('GENERIC_SMS_API_URL', 'https://sms.example.invalid/send');
 scriptProperties.set('SMS_PROVIDER', 'twilio');
 scriptProperties.set('TWILIO_ACCOUNT_SID', 'ACsynthetic');
 scriptProperties.set('TWILIO_AUTH_TOKEN', 'synthetic-token');
@@ -309,6 +268,15 @@ assert.match(lastRequest.endpoint, /Accounts\/ACsynthetic\/Messages\.json$/);
 assert.equal(lastRequest.options.payload.To, '+447700900123');
 scriptProperties.delete('SMS_PROVIDER');
 
+scriptProperties.set('ACTIVATED_AT', new Date().toISOString());
+context.configureModulusEmailPreset();
+assert.equal(scriptProperties.get('DEFAULT_COUNTRY_CODE'), '30');
+assert.equal(scriptProperties.get('ALLOWED_SENDER_EMAILS'), 'no-reply@modulus.gr');
+context.configureGenericEmailSource();
+assert.equal(scriptProperties.get('DEFAULT_COUNTRY_CODE'), '');
+assert.equal(scriptProperties.get('ALLOWED_SENDER_EMAILS'), '');
+assert.equal(scriptProperties.get('CALLER_NUMBER_PREFERENCE_PATTERN'), '');
+
 assert.equal(context.attemptTranscription_(null).transcript, '');
 assert.equal(context.shouldIncludeTranscript_(), false);
 assert.equal(context.maskPhone_('+447700900123'), '******0123');
@@ -317,9 +285,8 @@ assert.equal(
   context.estimateSmsSegments_(context.buildClientSms_('ignored'), 'gsm'),
   1
 );
-assert.equal(context.detectUrgency_('The animal has difficulty breathing.'), true);
-assert.equal(context.detectUrgency_('Το ζώο δεν αναπνέει καλά.'), true);
-assert.equal(context.detectUrgency_('Θέλω να κλείσουμε ένα ραντεβού.'), false);
+assert.equal(context.detectUrgency_('This request is time-sensitive.'), true);
+assert.equal(context.detectUrgency_('Please call when convenient.'), false);
 assert.equal(
   context.buildClientSms_('transcript must not alter the SMS'),
   'Thank you for your message. I am currently unavailable and will call you back as soon as possible.'
@@ -339,7 +306,7 @@ assert.deepEqual(
 );
 assert.throws(
   () => context.verifyCallActionToken_(validToken.slice(0, -1) + 'x'),
-  /δεν είναι έγκυρος/
+  /invalid/
 );
 
 console.log('All parser, provider, deduplication, privacy, and safety tests passed.');

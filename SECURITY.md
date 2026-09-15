@@ -12,7 +12,9 @@ Please do not open a public issue containing credentials, phone numbers, voicema
 - Use `TEST_RECIPIENT_LOCK_ENABLED=true` and a synthetic or owner-controlled `TEST_PHONE` for live tests.
 - Use `runOwnerVoicemailLiveTest()` for a one-shot test; it requires explicit confirmation, zero triggers, and restores DRY RUN.
 - Activate production only through `activateProductionAutomation()` with the one-shot `PRODUCTION_ACTIVATION_CONFIRMATION=ENABLE` property.
-- Keep the default live send window enabled; it allows SMS only from 09:00 through 21:00 Europe/Athens unless deliberately reconfigured with `SMS_SEND_TIME_ZONE`.
+- Keep the live send window enabled and set `SMS_SEND_TIME_ZONE` explicitly for the operating location. The neutral public default is `Etc/UTC`.
+- Configure `DEFAULT_COUNTRY_CODE`, `EXCLUDED_PHONE_NUMBERS`, and, when needed, `CALLER_NUMBER_PREFERENCE_PATTERN` so the parser cannot mistake a known destination number for a caller.
+- Use HTTPS provider endpoints. Runtime delivery and configuration validation reject plaintext HTTP endpoints.
 - Set `ALLOWED_SENDER_EMAILS` when the telephony provider has a stable sender address. The Modulus preset sets an exact `no-reply@modulus.gr` allowlist.
 - Keep `MAX_SMS_SEGMENTS=1` unless multi-part billing and delivery have been explicitly reviewed.
 - Restrict the call-tracking web app to the owner or an approved private audience.

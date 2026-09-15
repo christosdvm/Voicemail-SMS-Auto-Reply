@@ -9,7 +9,7 @@ Voicemail and caller numbers can be personal data. Audio and transcripts may con
 3. The selected SMS adapter receives the destination and fixed acknowledgement text when dry-run is disabled.
 4. Audio is sent to the configured transcription service only when both `TRANSCRIPTION_ENABLED=true` and `INTERNAL_NOTIFICATION_INCLUDE_TRANSCRIPT=true`.
 5. Internal notifications show a masked number and include transcript text only when explicitly enabled.
-6. Script Properties retain hashed message/phone keys, statuses, timestamps, and masked numbers. Expired state is purged automatically; the default retention is 35 days.
+6. Script Properties retain hashed message, phone, and provider-reference values plus statuses, timestamps, and masked numbers. Expired state is purged automatically; the default retention is 35 days.
 
 ## Minimization defaults
 
@@ -22,6 +22,6 @@ Voicemail and caller numbers can be personal data. Audio and transcripts may con
 - notifications require an explicit `NOTIFICATION_EMAIL` and transcript inclusion is separately opt-in;
 - live SMS is constrained by a configurable IANA-time-zone send window and a configurable segment limit;
 - no customer database is created by the script;
-- fixed wording prevents an AI model from generating clinical advice.
+- fixed wording prevents transcript or model output from influencing caller communication.
 
 You are still responsible for Gmail retention, access permissions, provider retention, transcription processor settings, and deletion requests.

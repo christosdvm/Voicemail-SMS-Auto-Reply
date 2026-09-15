@@ -19,7 +19,7 @@ The interesting engineering problem is not the HTTP request. It is deciding whet
 ## Non-goals
 
 - Sending voicemail transcripts to callers.
-- Generating medical, veterinary, legal, or other professional advice.
+- Generating advice or free-form responses from voicemail content.
 - Acting as a complete consent or regulatory-compliance system.
 - Replacing a queue-backed messaging platform at high scale.
 
@@ -55,7 +55,7 @@ flowchart TD
   H --> I[Hashed terminal state]
 ```
 
-The implementation stays in one Apps Script file for low-friction deployment. Internally, responsibilities are separated by functions and contracts so the core policies can be tested outside the Google runtime.
+Development happens in ordered modules under `src/`. A dependency-free build step generates one `Code.gs` file for low-friction Apps Script deployment, and CI verifies that source and bundle have not drifted.
 
 ## Reliability model
 
@@ -108,7 +108,7 @@ The Node test harness executes the pure portions of the Apps Script without call
 - HMAC signing and expiry;
 - privacy-sensitive formatting.
 
-GitHub Actions runs the validation suite on Node.js 18, 20, and 22. Live provider tests remain explicit one-shot operations because a unit test must never send a real SMS.
+GitHub Actions runs the validation suite on Node.js 20, 22, and 24. The same harness powers a credential-free synthetic demo. Live provider tests remain explicit one-shot operations because a unit test must never send a real SMS.
 
 ## Trade-offs
 
@@ -116,11 +116,11 @@ GitHub Actions runs the validation suite on Node.js 18, 20, and 22. Live provide
 
 Apps Script provides Gmail OAuth, scheduling, locks, properties, and email integration with minimal infrastructure. That makes the project easy to deploy for a small workflow.
 
-The trade-off is limited module tooling, local emulation, observability, and throughput. The roadmap therefore separates the current copy-paste distribution from a future modular TypeScript source tree.
+The trade-off is limited module tooling, local emulation, observability, and throughput. Ordered `.gs` modules improve the current codebase; a future typed core would create a stronger boundary between domain policy and Google-specific infrastructure.
 
 ### Why fixed acknowledgement text
 
-A deterministic acknowledgement is safer and easier to audit than AI-generated caller communication. Optional transcription can support an internal workflow, but it never modifies the external SMS.
+A deterministic acknowledgement is safer and easier to audit than generated or transcript-dependent caller communication. Optional transcription can support an internal workflow, but it never modifies the external SMS.
 
 ### Why no automatic retry after ambiguity
 
@@ -136,4 +136,4 @@ Duplicate communication is often more harmful than delayed manual review. The co
 
 ## Next steps
 
-See the [roadmap](../ROADMAP.md) for the modular core, provider contract tests, local simulator, and observability work planned beyond the current Apps Script reference implementation.
+See the [roadmap](../ROADMAP.md) for the typed core, provider contract tests, delivery receipts, and observability work planned beyond the current Apps Script reference implementation.

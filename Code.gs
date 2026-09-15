@@ -1,4 +1,13 @@
 /**
+ * GENERATED FILE — DO NOT EDIT DIRECTLY.
+ *
+ * Edit the ordered modules in src/ and run `npm run build`.
+ * Code.gs remains the copy-paste and clasp-compatible deployment artifact.
+ */
+
+// Source: src/00_config.gs
+
+/**
  * Voicemail SMS Auto-Reply
  * Provider-neutral Google Apps Script automation for voicemail and missed-call
  * notifications received by email.
@@ -17,15 +26,15 @@ const APP = Object.freeze({
   openAiUrl: 'https://api.openai.com/v1/audio/transcriptions',
   modulusUrl: 'https://messaging.modulus.gr/ott-api/message',
   telnyxUrl: 'https://api.telnyx.com/v2/messages',
-  smsTimeZone: 'Europe/Athens',
+  smsTimeZone: 'Etc/UTC',
   defaultTranscriptionModel: 'gpt-transcribe',
   defaultSmsText:
     'Thank you for your message. I am currently unavailable and will call you back as soon as possible.',
   defaultMissedCallSmsText:
     'Thank you for calling. I am currently unavailable and will call you back as soon as possible.',
-  defaultCountryCode: '30',
+  defaultCountryCode: '',
   defaultInboundParser: 'generic_email',
-  defaultSmsProvider: 'modulus',
+  defaultSmsProvider: 'webhook',
   maxThreadsPerRun: 50,
   maxMessagesPerRun: 10,
   maxAudioBytes: 25 * 1024 * 1024,
@@ -66,7 +75,7 @@ function initializeWithoutSending() {
     TRANSCRIPTION_ENABLED: 'false',
     INTERNAL_NOTIFICATION_INCLUDE_TRANSCRIPT: 'false',
     MISSED_CALLS_ENABLED: 'true',
-    SEND_INTERNAL_NOTIFICATION: 'true',
+    SEND_INTERNAL_NOTIFICATION: 'false',
     CALL_TRACKING_ENABLED: 'false',
     CALL_TRACKING_WEB_APP_URL: '',
     CALL_ACTION_MAX_AGE_DAYS: '180',
@@ -76,10 +85,12 @@ function initializeWithoutSending() {
     MISSED_CALL_SUBJECT_PATTERN: APP.defaultMissedCallSubjectPattern,
     CALLER_NUMBER_LABELS:
       'caller number|caller|from number|phone number|phone|Από τον αριθμό',
+    CALLER_NUMBER_PREFERENCE_PATTERN: '',
+    EXCLUDED_PHONE_NUMBERS: '',
     DEFAULT_COUNTRY_CODE: APP.defaultCountryCode,
     ALLOWED_SENDER_EMAILS: '',
     URGENCY_KEYWORDS:
-      'urgent|emergency|difficulty breathing|bleeding|seizure|poison|injury|επείγον|αιμορραγ|δεν αναπνέ|σπασμ|δηλητηρ|τραυματ',
+      'urgent|emergency|time-sensitive|as soon as possible|priority',
     SMS_PROVIDER: APP.defaultSmsProvider,
     OPENAI_TRANSCRIPTION_MODEL: APP.defaultTranscriptionModel,
     TRANSCRIPTION_LANGUAGE: '',
@@ -126,7 +137,7 @@ function initializeWithoutSending() {
   const result = {
     ok: true,
     message:
-      'Η αρχικοποίηση ολοκληρώθηκε. Τα υπάρχοντα emails αγνοούνται και δεν θα σταλεί SMS.',
+      'Initialization completed in dry-run mode. Existing emails are ignored and no SMS has been sent.',
     activationTime: props.getProperty('ACTIVATED_AT'),
     notificationEmailConfigured: Boolean(
       props.getProperty('NOTIFICATION_EMAIL')
@@ -154,6 +165,9 @@ function configureGenericEmailSource() {
     'CALLER_NUMBER_LABELS',
     'caller number|caller|from number|phone number|phone|Από τον αριθμό'
   );
+  props.setProperty('CALLER_NUMBER_PREFERENCE_PATTERN', '');
+  props.setProperty('EXCLUDED_PHONE_NUMBERS', '');
+  props.setProperty('DEFAULT_COUNTRY_CODE', APP.defaultCountryCode);
   props.setProperty('ALLOWED_SENDER_EMAILS', '');
   return getPublicConfigurationSummary_();
 }
@@ -179,6 +193,7 @@ function configureModulusEmailPreset() {
     'CALLER_NUMBER_LABELS',
     'Από τον αριθμό|caller number|from number|phone number'
   );
+  props.setProperty('CALLER_NUMBER_PREFERENCE_PATTERN', '^\\+3069\\d{8}$');
   props.setProperty('ALLOWED_SENDER_EMAILS', 'no-reply@modulus.gr');
   props.setProperty('DEFAULT_COUNTRY_CODE', '30');
   return getPublicConfigurationSummary_();
@@ -199,6 +214,10 @@ function getRuntimeConfig_() {
     callerNumberLabels:
       props.getProperty('CALLER_NUMBER_LABELS') ||
       'caller number|caller|from number|phone number|phone|Από τον αριθμό',
+    callerNumberPreferencePattern:
+      props.getProperty('CALLER_NUMBER_PREFERENCE_PATTERN') || '',
+    excludedPhoneNumbers:
+      props.getProperty('EXCLUDED_PHONE_NUMBERS') || '',
     allowedSenderEmails:
       props.getProperty('ALLOWED_SENDER_EMAILS') || '',
     defaultCountryCode:
@@ -232,8 +251,11 @@ function getPublicConfigurationSummary_() {
     transcriptionEnabled: config.transcriptionEnabled,
     internalTranscriptIncluded: config.includeTranscript,
     defaultCountryCode: config.defaultCountryCode,
+    excludedPhoneNumbersConfigured: Boolean(config.excludedPhoneNumbers.trim()),
   };
 }
+
+// Source: src/10_operations.gs
 
 /**
  * Prepares Gmail labels and a signing secret. It deliberately leaves call
@@ -251,7 +273,7 @@ function prepareCallTrackingWithoutSending() {
     enabled: false,
     webAppUrlDetected: Boolean(getCallTrackingWebAppUrl_()),
     message:
-      'Οι ετικέτες Gmail δημιουργήθηκαν. Η παρακολούθηση παραμένει ανενεργή μέχρι να ολοκληρωθεί η ιδιωτική ανάπτυξη web app.',
+      'Gmail labels are ready. Call tracking remains disabled until a private web-app deployment is configured.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -264,7 +286,7 @@ function enableCallTracking() {
   const webAppUrl = getCallTrackingWebAppUrl_();
   if (!webAppUrl) {
     throw new Error(
-      'Δεν βρέθηκε URL web app. Κάνε πρώτα Deploy > New deployment > Web app.'
+      'No web-app URL was found. Deploy the script as a private web app first.'
     );
   }
   ensureCallTrackingSecret_();
@@ -275,7 +297,7 @@ function enableCallTracking() {
     ok: true,
     enabled: true,
     webAppUrlConfigured: true,
-    message: 'Η παρακολούθηση κλήσεων μέσω Gmail ενεργοποιήθηκε.',
+    message: 'Gmail call tracking is enabled.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -290,7 +312,7 @@ function disableCallTracking() {
   const result = {
     ok: true,
     enabled: false,
-    message: 'Η παρακολούθηση κλήσεων μέσω Gmail απενεργοποιήθηκε.',
+    message: 'Gmail call tracking is disabled.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -336,10 +358,10 @@ function prepareSingleRecipientTest() {
   }).length;
 
   if (!testPhone) {
-    throw new Error('Λείπει έγκυρο TEST_PHONE από τα Script Properties.');
+    throw new Error('TEST_PHONE must contain a valid recipient number.');
   }
   if (triggerCount) {
-    throw new Error('Η δοκιμή απαιτεί 0 ενεργά triggers.');
+    throw new Error('Safe test preparation requires zero active automation triggers.');
   }
 
   props.setProperty('AUTOMATION_ENABLED', 'false');
@@ -355,7 +377,7 @@ function prepareSingleRecipientTest() {
     smsDryRun: true,
     triggerCount: 0,
     message:
-      'Η δοκιμή προετοιμάστηκε. Μόνο το TEST_PHONE επιτρέπεται και καμία ζωντανή αποστολή δεν έχει οπλιστεί.',
+      'Safe test mode is ready. Only TEST_PHONE is allowed and live delivery has not been armed.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -373,7 +395,7 @@ function runSingleRecipientLiveTest() {
 function runOwnerVoicemailLiveTest() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
-    throw new Error('Εκτελείται ήδη άλλη δοκιμή ή επεξεργασία. Δοκίμασε ξανά αργότερα.');
+    throw new Error('Another test or processing run is active. Try again later.');
   }
   try {
     ensureInitialized_();
@@ -384,19 +406,19 @@ function runOwnerVoicemailLiveTest() {
     );
     const triggerCount = getAutomationTriggerCount_();
     if (!isTrue_(props.getProperty('TEST_RECIPIENT_LOCK_ENABLED')) || !testPhone) {
-      throw new Error('Η δοκιμή ενός παραλήπτη δεν έχει προετοιμαστεί σωστά.');
+      throw new Error('Single-recipient test mode has not been prepared correctly.');
     }
     if (triggerCount || isTrue_(props.getProperty('AUTOMATION_ENABLED'))) {
       throw new Error(
-        'Η ζωντανή δοκιμή απαιτεί απενεργοποιημένη αυτοματοποίηση και 0 triggers.'
+        'A live test requires paused automation and zero active triggers.'
       );
     }
     if (props.getProperty('LIVE_TEST_CONFIRMATION') !== 'YES') {
-      throw new Error('Λείπει η εφάπαξ επιβεβαίωση LIVE_TEST_CONFIRMATION=YES.');
+      throw new Error('Set the one-shot LIVE_TEST_CONFIRMATION=YES property first.');
     }
     validateLiveSmsConfiguration_();
     if (!isSmsSendWindowOpen_()) {
-      throw new Error('Η ζωντανή δοκιμή επιτρέπεται μόνο μέσα στο ωράριο αποστολής SMS.');
+      throw new Error('Live tests are allowed only inside the configured SMS send window.');
     }
 
     const activatedAt = getActivationTimestamp_();
@@ -417,7 +439,7 @@ function runOwnerVoicemailLiveTest() {
         return a.getDate().getTime() - b.getDate().getTime();
       });
     if (!messages.length) {
-      throw new Error('Δεν βρέθηκε νέο, μη επεξεργασμένο voicemail από το TEST_PHONE.');
+      throw new Error('No new unprocessed voicemail from TEST_PHONE was found.');
     }
 
     props.deleteProperty('LIVE_TEST_CONFIRMATION');
@@ -443,7 +465,7 @@ function activateAutomation() {
 
   const validation = validateConfiguration_();
   if (!validation.ok) {
-    throw new Error('Δεν μπορεί να ενεργοποιηθεί: ' + validation.errors.join(' | '));
+    throw new Error('Automation cannot be activated: ' + validation.errors.join(' | '));
   }
 
   removeAutomationTriggers_();
@@ -454,7 +476,7 @@ function activateAutomation() {
     ok: true,
     dryRun: true,
     message:
-      'Η αυτοματοποίηση ενεργοποιήθηκε μόνο σε DRY RUN. Έλεγχος Gmail κάθε 1 λεπτό, χωρίς SMS.',
+      'Automation is active in dry-run mode. Gmail is checked every minute without sending SMS.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -465,13 +487,13 @@ function activateProductionAutomation() {
   ensureInitialized_();
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
-    throw new Error('Εκτελείται ήδη άλλη λειτουργία. Δοκίμασε ξανά αργότερα.');
+    throw new Error('Another operation is already running. Try again later.');
   }
   const props = PropertiesService.getScriptProperties();
   try {
     if (props.getProperty('PRODUCTION_ACTIVATION_CONFIRMATION') !== 'ENABLE') {
       throw new Error(
-        'Λείπει η εφάπαξ επιβεβαίωση PRODUCTION_ACTIVATION_CONFIRMATION=ENABLE.'
+        'Set the one-shot PRODUCTION_ACTIVATION_CONFIRMATION=ENABLE property first.'
       );
     }
     validateProductionConfiguration_();
@@ -499,7 +521,7 @@ function activateProductionAutomation() {
       smsDryRun: false,
       activatedAt: props.getProperty('ACTIVATED_AT'),
       triggerCount: getAutomationTriggerCount_(),
-      message: 'Η παραγωγική λειτουργία ενεργοποιήθηκε μόνο για νέα emails.',
+      message: 'Production mode is active for newly received emails only.',
     };
     console.log(JSON.stringify(result, null, 2));
     return result;
@@ -513,7 +535,11 @@ function pauseAutomation() {
   const props = PropertiesService.getScriptProperties();
   props.setProperties({ AUTOMATION_ENABLED: 'false', SMS_DRY_RUN: 'true' });
   clearLiveConfirmations_();
-  const result = { ok: true, smsDryRun: true, message: 'Η αυτοματοποίηση τέθηκε σε παύση και η αποστολή SMS κλειδώθηκε.' };
+  const result = {
+    ok: true,
+    smsDryRun: true,
+    message: 'Automation is paused and SMS delivery is locked.',
+  };
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
@@ -528,7 +554,7 @@ function deactivateAutomation() {
     ok: true,
     removedTriggers: removed,
     smsDryRun: true,
-    message: 'Η αυτοματοποίηση απενεργοποιήθηκε και η αποστολή SMS κλειδώθηκε.',
+    message: 'Automation is disabled and SMS delivery is locked.',
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -557,17 +583,17 @@ function processNewVoicemailsNow() {
   if (!isTrue_(props.getProperty('SMS_DRY_RUN'))) {
     const lock = LockService.getScriptLock();
     if (!lock.tryLock(5000)) {
-      throw new Error('Εκτελείται ήδη άλλη λειτουργία. Δοκίμασε ξανά αργότερα.');
+      throw new Error('Another operation is already running. Try again later.');
     }
     try {
       if (props.getProperty('MANUAL_LIVE_CONFIRMATION') !== 'YES') {
         throw new Error(
-          'Η χειροκίνητη ζωντανή εκτέλεση απαιτεί MANUAL_LIVE_CONFIRMATION=YES.'
+          'A manual live run requires MANUAL_LIVE_CONFIRMATION=YES.'
         );
       }
       validateProductionConfiguration_();
       if (!isSmsSendWindowOpen_()) {
-        throw new Error('Η χειροκίνητη ζωντανή εκτέλεση επιτρέπεται μόνο μέσα στο ωράριο αποστολής SMS.');
+        throw new Error('Manual live runs are allowed only inside the SMS send window.');
       }
       props.deleteProperty('MANUAL_LIVE_CONFIRMATION');
     } finally {
@@ -612,7 +638,7 @@ function testMatchingEmailByOrder_(order) {
 
   if (!messages.length) {
     throw new Error(
-      'Δεν βρέθηκε νέο ηχητικό email για τον επιτρεπόμενο δοκιμαστικό αριθμό.'
+      'No new voicemail email was found for the allowed test recipient.'
     );
   }
 
@@ -661,7 +687,7 @@ function testLatestMissedCallEmail() {
     });
 
   if (!messages.length) {
-    throw new Error('Δεν βρέθηκε matching missed-call email.');
+    throw new Error('No matching missed-call email was found.');
   }
 
   const message = messages[0];
@@ -892,6 +918,8 @@ function runSelfTests() {
   return result;
 }
 
+// Source: src/20_processor.gs
+
 function processCandidateMessages_(manualRun) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) {
@@ -972,7 +1000,7 @@ function processCandidateMessages_(manualRun) {
             processingError:
               failure.error +
               (failure.stateSaveError
-                ? ' | Δεν αποθηκεύτηκε η κατάσταση: ' + failure.stateSaveError
+                ? ' | State could not be saved: ' + failure.stateSaveError
                 : ''),
           });
           failure.notificationSent = notification.sent;
@@ -1041,7 +1069,7 @@ function processSingleVoicemail_(message) {
       status: state.status,
       smsResult: null,
       transcript: '',
-      transcriptionError: 'Η μεταγραφή παραλείφθηκε λόγω του κλειδώματος δοκιμής.',
+      transcriptionError: 'Transcription was skipped because the test-recipient lock is active.',
     });
     return state;
   }
@@ -1129,7 +1157,7 @@ function processSingleVoicemail_(message) {
     try {
       recordSuccessfulReply_(parsed.phoneE164, messageId, 'voicemail');
     } catch (error) {
-      console.warn('Δεν ενημερώθηκε η ώρα επιτυχούς SMS: ' + safeErrorMessage_(error));
+      console.warn('Could not record successful SMS: ' + safeErrorMessage_(error));
     }
   }
 
@@ -1148,7 +1176,7 @@ function processSingleVoicemail_(message) {
     phoneMasked: maskPhone_(parsed.phoneE164),
     audioFound: Boolean(parsed.audio),
     transcriptAvailable: Boolean(transcription.transcript),
-    urgentKeywordsDetected: detectUrgency_(transcription.transcript),
+    priorityKeywordsDetected: detectUrgency_(transcription.transcript),
     providerMessageId: smsResult.providerMessageId || '',
     notificationSent: notification.sent,
     notificationError: notification.error,
@@ -1316,7 +1344,7 @@ function processSingleMissedCall_(message, allMessages) {
     phoneMasked: maskPhone_(parsed.phoneE164),
     audioFound: false,
     transcriptAvailable: false,
-    urgentKeywordsDetected: false,
+    priorityKeywordsDetected: false,
     providerMessageId: smsResult.providerMessageId || '',
     notificationSent: notification.sent,
     notificationError: notification.error,
@@ -1406,6 +1434,8 @@ function getGmailQueryForType_(messageType) {
   return props.getProperty(specificKey) || getRuntimeConfig_().gmailQuery;
 }
 
+// Source: src/30_parsing.gs
+
 function matchesConfiguredPattern_(value, pattern) {
   const candidate = String(pattern || '').trim();
   if (!candidate) return false;
@@ -1469,7 +1499,7 @@ function extractPhoneFromText_(text) {
         labelMatch[1],
         config.defaultCountryCode
       );
-      if (labeledPhone) return labeledPhone;
+      if (labeledPhone && !isExcludedPhone_(labeledPhone)) return labeledPhone;
     }
   }
   return extractAnyPhone_(value, config.defaultCountryCode);
@@ -1485,11 +1515,10 @@ function extractPhoneFromFilename_(filename) {
     .map(function (candidate) {
       return normalizePhoneE164_(candidate, config.defaultCountryCode);
     })
-    .filter(Boolean);
-  const preferred = normalized.find(function (phone) {
-    return phone.indexOf('+30') === 0 && phone.slice(3, 5) === '69';
-  });
-  return preferred || normalized[0] || '';
+    .filter(function (phone) {
+      return phone && !isExcludedPhone_(phone);
+    });
+  return selectPreferredCallerNumber_(normalized);
 }
 
 function extractAnyGreekMobile_(text) {
@@ -1532,11 +1561,45 @@ function extractAnyPhone_(text, defaultCountryCode) {
     .map(function (candidate) {
       return normalizePhoneE164_(candidate, defaultCountryCode);
     })
-    .filter(Boolean);
-  const preferred = normalized.find(function (phone) {
-    return phone.indexOf('+30') === 0 && phone.slice(3, 5) === '69';
+    .filter(function (phone) {
+      return phone && !isExcludedPhone_(phone);
+    });
+  return selectPreferredCallerNumber_(normalized);
+}
+
+/**
+ * Select a caller deterministically when a provider exposes more than one
+ * number. A provider preset may supply a regex; generic mode keeps source
+ * order and lets EXCLUDED_PHONE_NUMBERS remove known destination numbers.
+ */
+function selectPreferredCallerNumber_(phones) {
+  const unique = (phones || []).filter(function (phone, index, all) {
+    return phone && all.indexOf(phone) === index;
   });
-  return preferred || normalized[0] || '';
+  const pattern = getRuntimeConfig_().callerNumberPreferencePattern;
+  if (pattern) {
+    try {
+      const matcher = new RegExp(pattern);
+      const preferred = unique.find(function (phone) {
+        return matcher.test(phone);
+      });
+      if (preferred) return preferred;
+    } catch (error) {
+      // Invalid optional preferences fail back to deterministic source order.
+    }
+  }
+  return unique[0] || '';
+}
+
+function isExcludedPhone_(phoneE164) {
+  const config = getRuntimeConfig_();
+  const excluded = String(config.excludedPhoneNumbers || '')
+    .split(/[|,]/)
+    .map(function (phone) {
+      return normalizePhoneE164_(phone, config.defaultCountryCode);
+    })
+    .filter(Boolean);
+  return excluded.indexOf(phoneE164) !== -1;
 }
 
 function escapeRegExp_(value) {
@@ -1577,6 +1640,8 @@ function isMessageAllowedForCurrentTest_(message) {
   return isSmsRecipientAllowed_(parseVoicemailMessage_(message).phoneE164);
 }
 
+// Source: src/40_transcription.gs
+
 function findSupportedAudioAttachment_(attachments) {
   const supportedExtensions = /\.(wav|mp3|mp4|mpeg|mpga|m4a|webm)$/i;
   const supportedMime = /^(audio\/(?:x-wav|wav|wave|mpeg|mp4|x-m4a|webm)|video\/mp4)$/i;
@@ -1596,12 +1661,12 @@ function transcribeAudio_(audioBlob) {
   const props = PropertiesService.getScriptProperties();
   const apiKey = props.getProperty('OPENAI_API_KEY');
   if (!apiKey) {
-    throw new Error('Λείπει το OPENAI_API_KEY από τα Script Properties.');
+    throw new Error('OPENAI_API_KEY is missing from Script Properties.');
   }
 
   const bytes = audioBlob.getBytes();
   if (bytes.length > APP.maxAudioBytes) {
-    throw new Error('Το αρχείο ήχου υπερβαίνει το όριο των 25 MB.');
+    throw new Error('The audio attachment exceeds the 25 MB limit.');
   }
 
   const payload = {
@@ -1630,12 +1695,12 @@ function transcribeAudio_(audioBlob) {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error('Η OpenAI επέστρεψε μη αναμενόμενη απάντηση.');
+    throw new Error('The transcription provider returned an unexpected response.');
   }
 
   const text = normalizeWhitespace_(parsed.text || '');
   if (!text) {
-    throw new Error('Η μεταγραφή ήταν κενή.');
+    throw new Error('The transcription result was empty.');
   }
   return text;
 }
@@ -1644,11 +1709,11 @@ function attemptTranscription_(audioBlob) {
   if (!audioBlob) {
     return {
       transcript: '',
-      error: 'Δεν βρέθηκε υποστηριζόμενο αρχείο ήχου.',
+      error: 'No supported audio attachment was found.',
     };
   }
   if (!isTranscriptionEnabled_() || !shouldIncludeTranscript_()) {
-    return { transcript: '', error: 'Η μεταγραφή είναι απενεργοποιημένη.' };
+    return { transcript: '', error: 'Transcription is disabled.' };
   }
   try {
     return { transcript: transcribeAudio_(audioBlob), error: '' };
@@ -1664,6 +1729,8 @@ function shouldIncludeTranscript_() {
     )
   );
 }
+
+// Source: src/50_sms_providers.gs
 
 function getSmsProvider_() {
   return getRuntimeConfig_().smsProvider;
@@ -1710,17 +1777,17 @@ function sendSmsViaModulus_(phoneE164, text, correlationId) {
     getRuntimeConfig_().defaultCountryCode
   ).replace(/^\+/, '');
 
-  if (!msisdn) throw new Error('Μη έγκυρος αριθμός παραλήπτη.');
+  if (!msisdn) throw new Error('The recipient number is invalid.');
   if (!isSmsRecipientAllowed_(phoneE164)) {
     throw new Error(
-      'Η αποστολή μπλοκαρίστηκε: ο παραλήπτης δεν είναι το TEST_PHONE.'
+      'Delivery was blocked because the recipient does not match TEST_PHONE.'
     );
   }
   if (!isSmsSendWindowOpen_()) {
     throw new Error('SMS sending is blocked outside the configured send window.');
   }
-  if (!apiKey) throw new Error('Λείπει το MODULUS_API_KEY.');
-  if (!sender) throw new Error('Λείπει το SMS_SENDER_ID.');
+  if (!apiKey) throw new Error('MODULUS_API_KEY is missing.');
+  if (!sender) throw new Error('SMS_SENDER_ID is missing.');
   if (!isAllowedModulusEndpoint_(endpoint)) {
     throw new Error('MODULUS_API_URL must be the approved HTTPS endpoint.');
   }
@@ -1761,7 +1828,7 @@ function sendSmsViaModulus_(phoneE164, text, correlationId) {
     });
   } catch (error) {
     throw new Error(
-      'Δεν επιβεβαιώθηκε η αποστολή από το Modulus. Μην επαναλάβεις αυτόματα: ' +
+      'Modulus delivery was not confirmed. Do not retry automatically: ' +
         safeErrorMessage_(error)
     );
   }
@@ -1783,7 +1850,7 @@ function sendSmsViaModulus_(phoneE164, text, correlationId) {
   const providerCode = first && first.status ? Number(first.status.code) : NaN;
   if (!first || providerCode !== 10) {
     throw new Error(
-      'Το Modulus δεν επιβεβαίωσε MESSAGE_ACCEPTED: ' + safeApiError_(raw)
+      'Modulus did not confirm MESSAGE_ACCEPTED: ' + safeApiError_(raw)
     );
   }
 
@@ -1944,6 +2011,9 @@ function normalizePhoneForSms_(phoneE164) {
 }
 
 function fetchFormSmsProvider_(endpoint, payload, headers) {
+  if (!isHttpsEndpoint_(endpoint)) {
+    throw new Error('SMS provider endpoint must use HTTPS.');
+  }
   let response;
   try {
     response = UrlFetchApp.fetch(endpoint, {
@@ -1963,6 +2033,9 @@ function fetchFormSmsProvider_(endpoint, payload, headers) {
 }
 
 function fetchJsonSmsProvider_(endpoint, payload, apiKey) {
+  if (!isHttpsEndpoint_(endpoint)) {
+    throw new Error('SMS provider endpoint must use HTTPS.');
+  }
   let response;
   const headers = { Accept: 'application/json' };
   if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
@@ -1990,6 +2063,8 @@ function parseJsonSafely_(raw) {
     return {};
   }
 }
+
+// Source: src/60_delivery_policy.gs
 
 /** The transcript is intentionally ignored: the client receives fixed text. */
 function buildClientSms_(_transcript) {
@@ -2125,45 +2200,45 @@ function sendInternalNotification_(message, parsed, details) {
     processingError: safeErrorMessage_(details.processingError || ''),
   });
 
-  const urgent = detectUrgency_(notificationDetails.transcript || '');
+  const priorityKeywordDetected = detectUrgency_(notificationDetails.transcript || '');
   const statusLabel = statusLabel_(notificationDetails.status);
   const subject =
-    (urgent ? '[ΠΙΘΑΝΩΣ ΕΠΕΙΓΟΝ] ' : '') +
-    (parsed.messageType === 'missed_call' ? 'Αναπάντητη κλήση ' : 'Τηλεφωνητής ') +
+    (priorityKeywordDetected ? '[PRIORITY KEYWORD] ' : '') +
+    (parsed.messageType === 'missed_call' ? 'Missed call ' : 'Voicemail ') +
     maskPhone_(parsed.phoneE164) +
     ' — ' +
     statusLabel;
   const receivedAt = Utilities.formatDate(
     message.getDate(),
-    Session.getScriptTimeZone() || 'Europe/Athens',
-    'dd/MM/yyyy HH:mm:ss'
+    Session.getScriptTimeZone() || APP.smsTimeZone,
+    'yyyy-MM-dd HH:mm:ss z'
   );
 
   const lines = [
-    'Αριθμός: ' + maskPhone_(parsed.phoneE164),
-    'Τύπος: ' +
-      (parsed.messageType === 'missed_call' ? 'αναπάντητη κλήση' : 'φωνητικό μήνυμα'),
-    'Λήψη email: ' + receivedAt,
-    'Κατάσταση SMS: ' + statusLabel,
+    'Caller: ' + maskPhone_(parsed.phoneE164),
+    'Event: ' +
+      (parsed.messageType === 'missed_call' ? 'missed call' : 'voicemail'),
+    'Email received: ' + receivedAt,
+    'SMS status: ' + statusLabel,
     'Message reference hash: ' + hashText_(message.getId()).slice(0, 20),
     '',
   ];
 
   if (notificationDetails.transcript) {
-    lines.push('Μεταγραφή:');
+    lines.push('Transcript:');
     lines.push(notificationDetails.transcript);
     lines.push('');
   }
   if (notificationDetails.transcriptionError) {
-    lines.push('Σημείωση μεταγραφής: ' + notificationDetails.transcriptionError);
+    lines.push('Transcription note: ' + notificationDetails.transcriptionError);
     lines.push('');
   }
   if (notificationDetails.processingError) {
-    lines.push('Σφάλμα επεξεργασίας: ' + notificationDetails.processingError);
+    lines.push('Processing error: ' + notificationDetails.processingError);
     lines.push('');
   }
   lines.push(
-    'Η ένδειξη επείγοντος βασίζεται μόνο σε λέξεις-κλειδιά και δεν αποτελεί κλινική αξιολόγηση.'
+    'Priority keyword matching is a routing hint, not a determination of urgency.'
   );
 
   const tracking = buildCallTrackingContext_(
@@ -2174,7 +2249,7 @@ function sendInternalNotification_(message, parsed, details) {
   if (tracking.enabled) {
     lines.push('');
     lines.push(
-      'Για καταγραφή της κλήσης, χρησιμοποίησε τα κουμπιά στην έκδοση HTML αυτού του email.'
+      'Use the buttons in the HTML version of this email to update call status.'
     );
   }
 
@@ -2197,11 +2272,13 @@ function sendInternalNotification_(message, parsed, details) {
       setCallTrackingStatus_(message, 'pending');
     } catch (error) {
       console.warn(
-        'Δεν εφαρμόστηκε η ετικέτα ΠΡΟΣ ΚΛΗΣΗ: ' + safeErrorMessage_(error)
+        'Could not apply the pending-call label: ' + safeErrorMessage_(error)
       );
     }
   }
 }
+
+// Source: src/70_call_tracking.gs
 
 /**
  * Web-app entry point. The signed action is kept in the URL fragment, so
@@ -2209,7 +2286,7 @@ function sendInternalNotification_(message, parsed, details) {
  */
 function doGet() {
   return HtmlService.createHtmlOutput(buildCallTrackingPage_())
-    .setTitle('Ενημέρωση κλήσης')
+    .setTitle('Call status')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
@@ -2217,19 +2294,19 @@ function doGet() {
 function handleCallTrackingAction(token) {
   const props = PropertiesService.getScriptProperties();
   if (!isTrue_(props.getProperty('CALL_TRACKING_ENABLED'))) {
-    throw new Error('Η παρακολούθηση κλήσεων δεν είναι ενεργή.');
+    throw new Error('Call tracking is not enabled.');
   }
 
   const action = verifyCallActionToken_(token);
   const message = GmailApp.getMessageById(action.messageId);
-  if (!message) throw new Error('Δεν βρέθηκε το σχετικό email.');
+  if (!message) throw new Error('The related email could not be found.');
   if (!isTrustedInboundMessage_(message)) {
-    throw new Error('Το email δεν περνά την πολιτική trusted sender/subject.');
+    throw new Error('The email does not satisfy the trusted sender and subject policy.');
   }
 
   const parsed = parseVoicemailMessage_(message);
   if (!parsed.phoneE164) {
-    throw new Error('Δεν αναγνωρίστηκε έγκυρος αριθμός κινητού.');
+    throw new Error('A valid caller number could not be identified.');
   }
 
   setCallTrackingStatus_(message, action.action);
@@ -2239,9 +2316,9 @@ function handleCallTrackingAction(token) {
   setMessageState_(message.getId(), existingState);
 
   const labels = {
-    attempted: 'Έγινε προσπάθεια κλήσης',
-    completed: 'Η κλήση ολοκληρώθηκε',
-    retry: 'Δεν απάντησε — χρειάζεται επανάκληση',
+    attempted: 'Call started',
+    completed: 'Call completed',
+    retry: 'No answer — callback required',
   };
 
   return {
@@ -2306,36 +2383,36 @@ function buildInternalNotificationHtml_(
 ) {
   const typeLabel =
     parsed.messageType === 'missed_call'
-      ? 'Αναπάντητη κλήση'
-      : 'Φωνητικό μήνυμα';
+      ? 'Missed call'
+      : 'Voicemail';
   const transcriptHtml = details.transcript
-    ? '<div style="margin-top:18px"><div style="font-weight:700;margin-bottom:6px">Μεταγραφή</div>' +
+    ? '<div style="margin-top:18px"><div style="font-weight:700;margin-bottom:6px">Transcript</div>' +
       '<div style="white-space:pre-wrap;line-height:1.55;background:#f6f8fa;padding:14px;border-radius:10px">' +
       escapeHtml_(details.transcript) +
       '</div></div>'
     : '';
   const warningHtml = details.transcriptionError
-    ? '<p style="color:#7c5200"><strong>Σημείωση μεταγραφής:</strong> ' +
+    ? '<p style="color:#7c5200"><strong>Transcription note:</strong> ' +
       escapeHtml_(details.transcriptionError) +
       '</p>'
     : '';
   const errorHtml = details.processingError
-    ? '<p style="color:#b42318"><strong>Σφάλμα επεξεργασίας:</strong> ' +
+    ? '<p style="color:#b42318"><strong>Processing error:</strong> ' +
       escapeHtml_(details.processingError) +
       '</p>'
     : '';
   const buttonsHtml = tracking.enabled
     ? '<div style="margin-top:22px">' +
-      notificationButtonHtml_(tracking.callUrl, '📞 Κάλεσε τώρα', '#0f766e') +
+      notificationButtonHtml_(tracking.callUrl, '📞 Call now', '#0f766e') +
       '<div style="margin-top:12px">' +
       notificationButtonHtml_(
         tracking.completedUrl,
-        '✅ Ολοκληρώθηκε',
+        '✅ Completed',
         '#2563eb'
       ) +
       notificationButtonHtml_(
         tracking.retryUrl,
-        '🔁 Δεν απάντησε',
+        '🔁 No answer',
         '#b45309'
       ) +
       '</div></div>'
@@ -2348,16 +2425,16 @@ function buildInternalNotificationHtml_(
     escapeHtml_(typeLabel) +
     '</h2>' +
     '<table style="border-collapse:collapse;width:100%;line-height:1.5">' +
-    notificationRowHtml_('Αριθμός', maskPhone_(parsed.phoneE164)) +
-    notificationRowHtml_('Λήψη email', receivedAt) +
-    notificationRowHtml_('Κατάσταση SMS', statusLabel) +
+    notificationRowHtml_('Caller', maskPhone_(parsed.phoneE164)) +
+    notificationRowHtml_('Email received', receivedAt) +
+    notificationRowHtml_('SMS status', statusLabel) +
     '</table>' +
     transcriptHtml +
     warningHtml +
     errorHtml +
     buttonsHtml +
     '<p style="font-size:12px;color:#667085;margin:20px 0 0">' +
-    'Η ένδειξη επείγοντος βασίζεται μόνο σε λέξεις-κλειδιά και δεν αποτελεί κλινική αξιολόγηση.' +
+    'Priority keyword matching is a routing hint, not a determination of urgency.' +
     '</p></div></div>'
   );
 }
@@ -2386,7 +2463,7 @@ function notificationButtonHtml_(url, label, color) {
 
 function buildCallTrackingPage_() {
   return [
-    '<!doctype html><html lang="el"><head>',
+    '<!doctype html><html lang="en"><head>',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
     '<style>',
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f7f8;color:#17212b;margin:0;padding:24px}',
@@ -2397,16 +2474,16 @@ function buildCallTrackingPage_() {
     '.spinner{width:30px;height:30px;border:4px solid #dbe3ea;border-top-color:#0f766e;border-radius:50%;animation:s 1s linear infinite;margin:18px 0}',
     '@keyframes s{to{transform:rotate(360deg)}}',
     '</style></head><body><main class="card">',
-    '<h1 id="title">Ενημέρωση κλήσης</h1>',
+    '<h1 id="title">Call status</h1>',
     '<div id="spinner" class="spinner"></div>',
-    '<p id="message" class="muted">Καταγράφεται η επιλογή σας…</p>',
-    '<a id="call" class="btn" href="#">📞 Κάλεσε τώρα</a>',
-    '<div id="actions" class="actions"><p class="muted">Μετά την κλήση επίλεξε:</p><a id="done" class="choice done" href="#">✅ Ολοκληρώθηκε</a><a id="retry" class="choice retry" href="#">🔁 Δεν απάντησε</a></div>',
+    '<p id="message" class="muted">Recording your selection…</p>',
+    '<a id="call" class="btn" href="#">📞 Call now</a>',
+    '<div id="actions" class="actions"><p class="muted">After the call:</p><a id="done" class="choice done" href="#">✅ Completed</a><a id="retry" class="choice retry" href="#">🔁 No answer</a></div>',
     '</main><script>',
     '(function(){',
     'var p=new URLSearchParams(location.hash.slice(1)),t=p.get("token");',
-    'function fail(e){document.getElementById("spinner").style.display="none";document.getElementById("title").textContent="Δεν ολοκληρώθηκε";document.getElementById("message").textContent=(e&&e.message)||"Ο σύνδεσμος δεν είναι έγκυρος.";}',
-    'function ok(r){var sp=document.getElementById("spinner"),m=document.getElementById("message"),b=document.getElementById("call"),a=document.getElementById("actions");sp.style.display="none";document.getElementById("title").textContent=r.status;m.textContent="Αριθμός: "+r.phoneMasked;if(r.action==="attempted"&&r.phoneDial){b.href="tel:"+r.phoneDial;b.style.display="block";b.textContent="📞 Κάλεσε "+r.phoneMasked;document.getElementById("done").href=r.completedUrl;document.getElementById("retry").href=r.retryUrl;a.style.display="block";setTimeout(function(){location.href=b.href;},250);}}',
+    'function fail(e){document.getElementById("spinner").style.display="none";document.getElementById("title").textContent="Action not completed";document.getElementById("message").textContent=(e&&e.message)||"The link is invalid.";}',
+    'function ok(r){var sp=document.getElementById("spinner"),m=document.getElementById("message"),b=document.getElementById("call"),a=document.getElementById("actions");sp.style.display="none";document.getElementById("title").textContent=r.status;m.textContent="Caller: "+r.phoneMasked;if(r.action==="attempted"&&r.phoneDial){b.href="tel:"+r.phoneDial;b.style.display="block";b.textContent="📞 Call "+r.phoneMasked;document.getElementById("done").href=r.completedUrl;document.getElementById("retry").href=r.retryUrl;a.style.display="block";setTimeout(function(){location.href=b.href;},250);}}',
     'if(!t){fail();return;}google.script.run.withSuccessHandler(ok).withFailureHandler(fail).handleCallTrackingAction(t);',
     '})();',
     '</script></body></html>',
@@ -2426,7 +2503,7 @@ function buildCallActionUrl_(webAppUrl, messageId, action) {
 
 function createCallActionToken_(messageId, action) {
   const allowed = ['attempted', 'completed', 'retry'];
-  if (allowed.indexOf(action) === -1) throw new Error('Μη έγκυρη ενέργεια.');
+  if (allowed.indexOf(action) === -1) throw new Error('Invalid call-tracking action.');
   const data = {
     version: 1,
     messageId: String(messageId),
@@ -2445,7 +2522,7 @@ function createCallActionToken_(messageId, action) {
 function verifyCallActionToken_(token) {
   const parts = String(token || '').split('.');
   if (parts.length !== 2 || !constantTimeEqual_(signCallActionPayload_(parts[0]), parts[1])) {
-    throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
+    throw new Error('The call-tracking link is invalid.');
   }
 
   let data;
@@ -2454,7 +2531,7 @@ function verifyCallActionToken_(token) {
       Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString()
     );
   } catch (error) {
-    throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
+    throw new Error('The call-tracking link is invalid.');
   }
 
   const allowed = ['attempted', 'completed', 'retry'];
@@ -2464,7 +2541,7 @@ function verifyCallActionToken_(token) {
     allowed.indexOf(data.action) === -1 ||
     !Number.isFinite(Number(data.issuedAt))
   ) {
-    throw new Error('Ο σύνδεσμος δεν είναι έγκυρος.');
+    throw new Error('The call-tracking link is invalid.');
   }
 
   const maxAgeDays = clamp_(
@@ -2478,7 +2555,7 @@ function verifyCallActionToken_(token) {
   );
   const age = Date.now() - Number(data.issuedAt);
   if (age < -300000 || age > maxAgeDays * 86400000) {
-    throw new Error('Ο σύνδεσμος έχει λήξει.');
+    throw new Error('The call-tracking link has expired.');
   }
 
   return {
@@ -2561,7 +2638,7 @@ function getOrCreateGmailLabel_(name) {
 
 function setCallTrackingStatus_(message, status) {
   const labelName = APP.callTrackingLabels[status];
-  if (!labelName) throw new Error('Μη έγκυρη κατάσταση κλήσης.');
+  if (!labelName) throw new Error('Invalid call status.');
   const thread = message.getThread();
   Object.keys(APP.callTrackingLabels).forEach(function (key) {
     const label = GmailApp.getUserLabelByName(APP.callTrackingLabels[key]);
@@ -2596,7 +2673,7 @@ function detectUrgency_(transcript) {
   if (!text) return false;
   const configured =
     PropertiesService.getScriptProperties().getProperty('URGENCY_KEYWORDS') ||
-    'urgent|emergency|difficulty breathing|bleeding|seizure|poison|injury|επείγον|αιμορραγ|δεν αναπνέ|σπασμ|δηλητηρ|τραυματ';
+    'urgent|emergency|time-sensitive|as soon as possible|priority';
   const keywords = String(configured)
     .split('|')
     .map(function (keyword) {
@@ -2607,6 +2684,8 @@ function detectUrgency_(transcript) {
     return text.indexOf(keyword) !== -1;
   });
 }
+
+// Source: src/80_state_and_validation.gs
 
 function validateConfiguration_() {
   const props = PropertiesService.getScriptProperties();
@@ -2627,7 +2706,23 @@ function validateConfiguration_() {
   }
 
   if (!Number.isFinite(Date.parse(props.getProperty('ACTIVATED_AT') || ''))) {
-    errors.push('Τρέξε πρώτα initializeWithoutSending.');
+    errors.push('Run initializeWithoutSending() first.');
+  }
+  const countryCode = String(props.getProperty('DEFAULT_COUNTRY_CODE') || '').trim();
+  if (!countryCode) {
+    warnings.push('DEFAULT_COUNTRY_CODE is empty; local-format caller numbers will be ignored.');
+  } else if (!/^\d{1,3}$/.test(countryCode)) {
+    errors.push('DEFAULT_COUNTRY_CODE must contain one to three digits without a plus sign.');
+  }
+  const callerPreference = String(
+    props.getProperty('CALLER_NUMBER_PREFERENCE_PATTERN') || ''
+  ).trim();
+  if (callerPreference) {
+    try {
+      new RegExp(callerPreference);
+    } catch (error) {
+      errors.push('CALLER_NUMBER_PREFERENCE_PATTERN must be a valid regular expression.');
+    }
   }
   const sendWindow = getSmsSendWindow_();
   if (sendWindow.enabled && !isValidSmsSendWindow_(sendWindow)) {
@@ -2638,7 +2733,9 @@ function validateConfiguration_() {
     props.getProperty('NOTIFICATION_EMAIL') || ''
   ).trim();
   if (!notificationEmail) {
-    warnings.push('Δεν έχει οριστεί NOTIFICATION_EMAIL.');
+    if (isTrue_(props.getProperty('SEND_INTERNAL_NOTIFICATION'))) {
+      warnings.push('Internal notifications are enabled but NOTIFICATION_EMAIL is empty.');
+    }
   } else if (!isValidNotificationEmail_(notificationEmail)) {
     if (isTrue_(props.getProperty('SEND_INTERNAL_NOTIFICATION'))) {
       errors.push('NOTIFICATION_EMAIL is not a valid email address.');
@@ -2651,7 +2748,7 @@ function validateConfiguration_() {
     !isTrue_(props.getProperty('SEND_INTERNAL_NOTIFICATION'))
   ) {
     warnings.push(
-      'Η παρακολούθηση κλήσεων είναι ενεργή, αλλά τα εσωτερικά email είναι κλειστά.'
+      'Call tracking is enabled while internal notification emails are disabled.'
     );
   }
   if (
@@ -2661,7 +2758,7 @@ function validateConfiguration_() {
     errors.push('A valid private Apps Script web app URL is required for call tracking.');
   }
   if (isTranscriptionEnabled_() && !props.getProperty('OPENAI_API_KEY')) {
-    warnings.push('Λείπει OPENAI_API_KEY: το SMS μπορεί να λειτουργήσει χωρίς μεταγραφή.');
+    warnings.push('OPENAI_API_KEY is missing; SMS delivery can continue without transcription.');
   }
   if (isTrue_(props.getProperty('TEST_RECIPIENT_LOCK_ENABLED'))) {
     const testPhone = normalizePhoneE164_(
@@ -2669,10 +2766,10 @@ function validateConfiguration_() {
       getRuntimeConfig_().defaultCountryCode
     );
     if (!testPhone) {
-      errors.push('Το TEST_RECIPIENT_LOCK_ENABLED απαιτεί έγκυρο TEST_PHONE.');
+      errors.push('TEST_RECIPIENT_LOCK_ENABLED requires a valid TEST_PHONE.');
     } else {
       warnings.push(
-        'Λειτουργεί κλείδωμα δοκιμής: SMS επιτρέπεται μόνο προς το TEST_PHONE.'
+        'Test-recipient lock is active; SMS is allowed only to TEST_PHONE.'
       );
     }
   }
@@ -2680,10 +2777,10 @@ function validateConfiguration_() {
   const voicemailSegments = estimateSmsSegments_(getSmsReplyText_(), getSmsEncoding_());
   const missedSegments = estimateSmsSegments_(getMissedCallSmsText_(), getSmsEncoding_());
   if (voicemailSegments > 1) {
-    warnings.push('Το SMS τηλεφωνητή θα χρεωθεί ως ' + voicemailSegments + ' τμήματα.');
+    warnings.push('The voicemail reply uses ' + voicemailSegments + ' SMS segments.');
   }
   if (isTrue_(props.getProperty('MISSED_CALLS_ENABLED')) && missedSegments > 1) {
-    warnings.push('Το SMS αναπάντητης κλήσης θα χρεωθεί ως ' + missedSegments + ' τμήματα.');
+    warnings.push('The missed-call reply uses ' + missedSegments + ' SMS segments.');
   }
 
   return { ok: errors.length === 0, errors: errors, warnings: warnings };
@@ -2729,6 +2826,21 @@ function collectSmsConfigurationErrors_(requireCredentials) {
     if (sender && !isValidSenderId_(sender)) {
       errors.push('SMS_SENDER_ID must contain 1–11 Latin letters, digits, or spaces.');
     }
+  }
+
+  const endpointPropertyByProvider = {
+    twilio: 'TWILIO_API_URL',
+    vonage: 'VONAGE_API_URL',
+    telnyx: 'TELNYX_API_URL',
+    webhook: 'GENERIC_SMS_API_URL',
+    generic_webhook: 'GENERIC_SMS_API_URL',
+  };
+  const endpointProperty = endpointPropertyByProvider[provider];
+  const configuredEndpoint = endpointProperty
+    ? String(props.getProperty(endpointProperty) || '').trim()
+    : '';
+  if (configuredEndpoint && !isHttpsEndpoint_(configuredEndpoint)) {
+    errors.push(endpointProperty + ' must use HTTPS.');
   }
 
   const rawEncoding = String(props.getProperty('SMS_ENCODING') || 'gsm').toLowerCase();
@@ -2778,6 +2890,10 @@ function isAllowedModulusEndpoint_(endpoint) {
   return String(endpoint || '').trim().replace(/\/+$/, '') === APP.modulusUrl;
 }
 
+function isHttpsEndpoint_(endpoint) {
+  return /^https:\/\/[^@\s/]+(?:[/?#]|$)/i.test(String(endpoint || '').trim());
+}
+
 function isValidSenderId_(sender) {
   const value = String(sender || '');
   return value === value.trim() && /^(?=.*[A-Za-z0-9])[A-Za-z0-9 ]{1,11}$/.test(value);
@@ -2817,7 +2933,7 @@ function ensureInitialized_() {
       )
     )
   ) {
-    throw new Error('Τρέξε πρώτα τη συνάρτηση initializeWithoutSending.');
+    throw new Error('Run initializeWithoutSending() first.');
   }
 }
 
@@ -2853,6 +2969,13 @@ function getMessageState_(messageId) {
 function setMessageState_(messageId, state) {
   const safeState = Object.assign({}, state || {});
   delete safeState.messageId;
+  if (safeState.providerMessageId) {
+    safeState.providerMessageIdHash = hashText_(safeState.providerMessageId).slice(
+      0,
+      40
+    );
+  }
+  delete safeState.providerMessageId;
   safeState.messageIdHash = hashText_(messageId).slice(0, 40);
   PropertiesService.getScriptProperties().setProperty(
     stateKey_(messageId),
@@ -3031,6 +3154,8 @@ function getAutomationTriggerCount_() {
   }).length;
 }
 
+// Source: src/90_utilities.gs
+
 function clearLiveConfirmations_() {
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty('LIVE_TEST_CONFIRMATION');
@@ -3173,7 +3298,7 @@ function redactProcessingResult_(result) {
     phoneMasked: result.phoneMasked || '',
     audioFound: Boolean(result.audioFound),
     transcriptAvailable: Boolean(result.transcriptAvailable),
-    urgentKeywordsDetected: Boolean(result.urgentKeywordsDetected),
+    priorityKeywordsDetected: Boolean(result.priorityKeywordsDetected),
     error: result.error || '',
   };
 }

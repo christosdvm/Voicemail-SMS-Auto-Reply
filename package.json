@@ -1,9 +1,19 @@
 {
   "name": "voicemail-sms-auto-reply-gas",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Gmail automation that replies by SMS to callers after voicemail or missed-call notifications, with provider-neutral SMS adapters",
-  "private": false,
+  "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/christosdvm/Voicemail-SMS-Auto-Reply.git"
+  },
+  "bugs": {
+    "url": "https://github.com/christosdvm/Voicemail-SMS-Auto-Reply/issues"
+  },
   "keywords": [
     "google-apps-script",
     "gmail",
@@ -17,8 +27,13 @@
   ],
   "type": "module",
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:bundle": "node scripts/build.mjs --check",
+    "demo": "node scripts/simulate.mjs",
     "test": "node tests/run-tests.mjs",
     "syntax": "node --check < Code.gs",
-    "validate": "npm test && npm run syntax"
+    "safety": "node scripts/check-public-safety.mjs",
+    "repository:check": "node scripts/check-repository.mjs",
+    "validate": "npm run check:bundle && npm test && npm run syntax && npm run safety && npm run repository:check"
   }
 }
