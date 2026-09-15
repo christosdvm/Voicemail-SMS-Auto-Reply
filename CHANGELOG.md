@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Recruiter-focused engineering case study and public roadmap.
+- Social-preview artwork for repository sharing.
+- README navigation, CI badges, design context, and engineering highlights.
+
 ## [1.3.1] - 2026-09-15
 
 ### Changed

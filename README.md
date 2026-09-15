@@ -1,6 +1,12 @@
-# Voicemail SMS Auto-Reply
+# Voicemail → Caller SMS Auto-Reply
+
+[![CI](https://github.com/christosdvm/Voicemail-SMS-Auto-Reply/actions/workflows/ci.yml/badge.svg)](https://github.com/christosdvm/Voicemail-SMS-Auto-Reply/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?logo=google&logoColor=white)](https://script.google.com/)
 
 Automatically sends a configurable SMS reply to callers when Gmail receives a voicemail or missed-call notification.
+
+[Installation](#installation) · [Architecture](#architecture) · [Provider adapters](docs/provider-adapters.md) · [Engineering case study](docs/CASE_STUDY.md) · [Roadmap](ROADMAP.md) · [Security](SECURITY.md)
 
 > **This is an auto-reply workflow, not voicemail-to-text conversion.** It extracts the caller's phone number from the notification and sends a predefined acknowledgement. Voicemail audio or transcript content is never copied into the caller-facing SMS.
 
@@ -9,6 +15,20 @@ This provider-neutral Google Apps Script project is designed as a public referen
 > **Modulus is optional.** Modulus is implemented as one provider adapter and one compatibility preset for Modulus-formatted email notifications. A Modulus account is not required: the same workflow supports Twilio, Vonage, Telnyx, or a generic JSON SMS webhook.
 
 ![Anonymized voicemail-triggered SMS reply workflow](docs/demo.svg)
+
+## Why this project exists
+
+Many telephony systems report voicemails and missed calls by email, while callers expect a quick acknowledgement on their phone. Connecting those systems safely is harder than a simple “send SMS” script: the workflow must extract unreliable caller data, avoid duplicate replies, isolate provider credentials, handle uncertain API outcomes, and minimize retained personal data.
+
+This project packages those concerns into a provider-neutral reference implementation with conservative defaults. For the design constraints, failure model, and trade-offs, read the [engineering case study](docs/CASE_STUDY.md).
+
+| Stage | Responsibility |
+| --- | --- |
+| Ingest | Poll Gmail using explicit OAuth scopes and configurable matching rules |
+| Understand | Classify the event and extract/normalize the caller number |
+| Decide | Apply deduplication, cooldown, time-window, and recipient safeguards |
+| Deliver | Send a fixed acknowledgement through the selected SMS adapter |
+| Retain | Store only hashed operational state and purge it automatically |
 
 ## What it does
 
@@ -25,6 +45,14 @@ This provider-neutral Google Apps Script project is designed as a public referen
 - Optionally sends a masked internal notification. Audio transcription is off by default and requires explicit privacy settings.
 - Provides optional private call-tracking links signed with HMAC.
 - Retains only hashed operational state and purges old state automatically; retention is configurable.
+
+## Engineering highlights
+
+- **Provider abstraction:** Modulus, Twilio, Vonage, Telnyx, and generic webhook adapters share one redacted result contract.
+- **Defensive delivery:** pre-send reservations and explicit ambiguous states reduce duplicate SMS risk when a provider response is uncertain.
+- **Privacy by default:** transcription and internal transcript sharing are disabled; phone numbers are masked and state keys are hashed.
+- **Operational safety:** dry-run, one-recipient locking, send windows, one-shot confirmations, and overlapping-run locks protect live environments.
+- **Portable verification:** the Apps Script behavior is exercised offline by Node-based parser, policy, provider, privacy, and signing tests across supported Node versions in CI.
 
 ## Architecture
 
@@ -178,6 +206,8 @@ CHANGELOG.md                    Release history
 ## Version
 
 The current source version is `v1.3.1`. See [CHANGELOG.md](CHANGELOG.md) for the version history.
+
+Planned work is tracked in the public [roadmap](ROADMAP.md) and repository issues. Roadmap items describe direction, not committed delivery dates.
 
 ## License
 
