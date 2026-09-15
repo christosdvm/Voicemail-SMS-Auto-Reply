@@ -1,0 +1,13 @@
+.clasp.json
+.env
+.env.*
+node_modules/
+coverage/
+*.log
+*.mp3
+*.mp4
+*.m4a
+*.wav
+*.webm
+*.ogg
+secrets.*

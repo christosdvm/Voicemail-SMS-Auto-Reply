@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+  <title id="title">Anonymized voicemail-triggered SMS reply workflow</title>
+  <desc id="desc">Gmail receives a synthetic voicemail alert, the caller number is checked, and the caller receives a predefined SMS reply.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#f7fbff"/><stop offset="1" stop-color="#eef7f4"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity=".12"/></filter>
+  </defs>
+  <rect width="1200" height="640" rx="28" fill="url(#bg)"/>
+  <text x="64" y="70" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#17212b">Voicemail SMS Auto-Reply</text>
+  <text x="64" y="106" font-family="Arial,sans-serif" font-size="17" fill="#667085">Gmail receives a voicemail alert, then the caller receives a predefined SMS reply</text>
+  <g filter="url(#shadow)">
+    <rect x="54" y="160" width="252" height="332" rx="18" fill="#fff" stroke="#d7e2ea"/>
+    <rect x="338" y="160" width="252" height="332" rx="18" fill="#fff" stroke="#d7e2ea"/>
+    <rect x="622" y="160" width="252" height="332" rx="18" fill="#fff" stroke="#d7e2ea"/>
+    <rect x="906" y="160" width="240" height="332" rx="18" fill="#fff" stroke="#d7e2ea"/>
+  </g>
+  <g font-family="Arial,sans-serif">
+    <text x="78" y="205" font-size="15" font-weight="700" fill="#0f766e">1 · INBOX</text>
+    <text x="78" y="246" font-size="18" font-weight="700" fill="#17212b">New voicemail</text>
+    <text x="78" y="279" font-size="15" fill="#667085">Caller number:</text>
+    <text x="78" y="304" font-size="18" font-weight="700" fill="#17212b">+44 7700 900123</text>
+    <rect x="78" y="339" width="194" height="42" rx="9" fill="#eef7f4"/>
+    <text x="94" y="366" font-size="15" fill="#0f766e">audio.wav attached</text>
+
+    <text x="362" y="205" font-size="15" font-weight="700" fill="#0f766e">2 · POLICY</text>
+    <text x="362" y="246" font-size="18" font-weight="700" fill="#17212b">Safe checks</text>
+    <text x="362" y="283" font-size="15" fill="#344054">✓ E.164 normalized</text>
+    <text x="362" y="315" font-size="15" fill="#344054">✓ cooldown checked</text>
+    <text x="362" y="347" font-size="15" fill="#344054">✓ recipient allowed</text>
+    <rect x="362" y="385" width="194" height="42" rx="9" fill="#eef7f4"/>
+    <text x="378" y="412" font-size="15" fill="#0f766e">POLICY PASSED</text>
+
+    <text x="646" y="205" font-size="15" font-weight="700" fill="#0f766e">3 · ADAPTER</text>
+    <text x="646" y="246" font-size="18" font-weight="700" fill="#17212b">SMS provider</text>
+    <text x="646" y="286" font-size="17" fill="#344054">Twilio / Vonage</text>
+    <text x="646" y="316" font-size="17" fill="#344054">Telnyx / Modulus</text>
+    <text x="646" y="346" font-size="17" fill="#344054">or JSON webhook</text>
+    <rect x="646" y="385" width="194" height="42" rx="9" fill="#eef2ff"/>
+    <text x="662" y="412" font-size="15" fill="#4338ca">provider-neutral</text>
+
+    <text x="930" y="205" font-size="15" font-weight="700" fill="#0f766e">4 · CALLER</text>
+    <text x="930" y="246" font-size="18" font-weight="700" fill="#17212b">SMS reply to caller</text>
+    <text x="930" y="285" font-size="15" fill="#344054">“Thanks — we received</text>
+    <text x="930" y="310" font-size="15" fill="#344054">your voicemail and will</text>
+    <text x="930" y="335" font-size="15" fill="#344054">call you back.”</text>
+    <rect x="930" y="375" width="174" height="42" rx="9" fill="#eef7f4"/>
+    <text x="946" y="402" font-size="15" fill="#0f766e">REPLY SENT</text>
+  </g>
+  <g stroke="#0f766e" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M310 326h20"/><path d="M594 326h20"/><path d="M878 326h20"/>
+  </g>
+  <g fill="#0f766e"><path d="m326 318 14 8-14 8z"/><path d="m610 318 14 8-14 8z"/><path d="m894 318 14 8-14 8z"/></g>
+  <text x="64" y="560" font-family="Arial,sans-serif" font-size="16" fill="#667085">Dry-run mode validates the workflow without contacting the caller.</text>
+</svg>
