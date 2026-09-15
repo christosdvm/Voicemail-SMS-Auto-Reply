@@ -3,4 +3,10 @@ SECURITY_GR.md
 MODULUS_REQUEST_GR.md
 tests/
 docs/
+src/
+scripts/
+config/
 *.md
+.editorconfig
+.gitattributes
+package.json
