@@ -5,13 +5,25 @@
 [![Google Apps Script](https://img.shields.io/badge/runtime-Google%20Apps%20Script-4285F4?logo=google&logoColor=white)](https://script.google.com/)
 [![No runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-344054.svg)](package.json)
 
-Turn voicemail and missed-call emails into a safe, deterministic SMS acknowledgement to the original caller.
+A privacy-conscious workflow automation system that turns voicemail and missed-call notification emails into safe, deterministic SMS acknowledgements to the original caller.
 
-[Try the local demo](#try-it-without-credentials) · [Install](#installation) · [Configuration](docs/CONFIGURATION.md) · [Design decisions](docs/decisions/README.md) · [Operations](docs/OPERATIONS.md) · [Roadmap](ROADMAP.md)
+[Try the local demo](#try-it-without-credentials) · [Install](#installation) · [Configuration](docs/CONFIGURATION.md) · [Case study](docs/CASE_STUDY.md) · [Design decisions](docs/decisions/README.md) · [Operations](docs/OPERATIONS.md) · [Roadmap](ROADMAP.md)
 
 > This is not voicemail-to-text messaging. The caller receives configured acknowledgement text; voicemail audio and transcripts never determine the outbound SMS.
 
 ![Synthetic voicemail-to-caller-SMS workflow](docs/demo.svg)
+
+---
+
+## At a glance
+
+| Area | What this repository demonstrates |
+| --- | --- |
+| Product thinking | A real clinical operations problem translated into explicit workflow rules and safe rollout states. |
+| Automation architecture | Gmail polling, event classification, phone-number normalization, send-window policy, deduplication, and provider adapters. |
+| Privacy engineering | Redacted state, hashed identifiers, bounded retention, opt-in transcription, and no committed real caller data. |
+| Reliability design | Locking, pre-send reservations, dry-run defaults, one-shot live activation, ambiguous-delivery handling, and synthetic tests. |
+| Portfolio value | A small but complete professional workflow product rather than a tutorial script or disconnected code sample. |
 
 ## Why I built it
 
@@ -22,6 +34,17 @@ The obvious implementation is a short script that reads a number and calls an SM
 Those questions shaped the project. The result is deliberately conservative automation for low-volume, human-owned workflows—not a claim to be a high-scale messaging platform.
 
 The original deployment used Modulus. Modulus is now one optional adapter; the policy and parsing layers do not depend on it.
+
+## What reviewers should notice
+
+This project is intentionally designed to show more than basic scripting ability.
+
+- **Workflow modelling:** inbound events are classified before action is allowed.
+- **Safety by default:** installation starts disabled and dry-run-first.
+- **Provider abstraction:** SMS vendors sit behind a small adapter boundary.
+- **Idempotency awareness:** message and caller state reduce duplicate replies across repeated runs.
+- **Privacy-first defaults:** identifiers are masked or hashed, and transcription is optional and isolated from outbound messaging.
+- **Operational humility:** the README documents boundaries instead of pretending Apps Script is a high-scale messaging platform.
 
 ## What the workflow does
 
@@ -57,6 +80,17 @@ The processing path is predictable:
 | Local-format numbers require an explicit country code | Guessing a country is unsafe in a reusable public project. |
 
 The longer rationale is recorded as short [architecture decision records](docs/decisions/README.md), including the consequences and limits of each choice.
+
+## Portfolio reading path
+
+For a quick professional review, read the repository in this order:
+
+1. **README** — product summary, workflow, installation and boundaries.
+2. **[Engineering case study](docs/CASE_STUDY.md)** — problem framing, architecture, trade-offs and verification strategy.
+3. **[Security](SECURITY.md) and [Privacy](PRIVACY.md)** — data-handling assumptions, deployment risks and reporting guidance.
+4. **[Operations runbook](docs/OPERATIONS.md)** — safe setup, rollout, manual tests, rollback and recovery.
+5. **[`src/`](src/)** — ordered Apps Script modules and policy implementation.
+6. **[`tests/`](tests/)** — offline harness and synthetic fixtures.
 
 ## Try it without credentials
 
@@ -154,6 +188,7 @@ scripts/check-public-safety.mjs
 tests/run-tests.mjs          Offline behavior and safety tests
 tests/helpers/               Apps Script runtime test harness
 tests/fixtures/              Synthetic inbound email examples
+docs/CASE_STUDY.md           Engineering case study for portfolio review
 docs/decisions/              Architecture decision records
 ```
 

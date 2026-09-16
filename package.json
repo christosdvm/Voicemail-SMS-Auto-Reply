@@ -1,7 +1,7 @@
 {
   "name": "voicemail-sms-auto-reply-gas",
   "version": "1.4.0",
-  "description": "Gmail automation that replies by SMS to callers after voicemail or missed-call notifications, with provider-neutral SMS adapters",
+  "description": "Privacy-conscious Gmail-to-SMS workflow automation for voicemail and missed-call acknowledgements, with provider-neutral SMS adapters",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -21,9 +21,15 @@
     "voicemail",
     "auto-reply",
     "missed-call",
-    "automation",
-    "oauth",
-    "privacy"
+    "workflow-automation",
+    "business-hours",
+    "privacy-by-design",
+    "provider-adapters",
+    "twilio",
+    "vonage",
+    "telnyx",
+    "modulus",
+    "oauth"
   ],
   "type": "module",
   "scripts": {
